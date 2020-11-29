@@ -1,0 +1,14 @@
+[Unit]
+Description=Phoniebox USB Encoder Service
+After=network.target iptables.service firewalld.service
+
+[Service]
+User=pi
+Group=pi
+Restart=always
+RestartSec=10
+WorkingDirectory=/home/pi/RPi-Jukebox-RFID
+ExecStart=/home/pi/RPi-Jukebox-RFID/components/control/buttons-USB-Encoder/buttons-USB-Encoder.py
+
+[Install]
+WantedBy=multi-user.target
