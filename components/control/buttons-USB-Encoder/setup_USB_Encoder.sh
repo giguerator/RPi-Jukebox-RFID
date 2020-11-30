@@ -33,4 +33,7 @@ sudo cp -v "${JUKEBOX_HOME_DIR}"/components/control/buttons-USB-Encoder/phoniebo
 sudo systemctl start phoniebox-usb-encoder.service
 sudo systemctl enable phoniebox-usb-encoder.service
 
+TODO remove gpio control
+
+
 printf "Done.\n"
