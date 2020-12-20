@@ -10,6 +10,7 @@ youtube_dl
 pyserial
 RPi.GPIO
 Pillow
+st7789
 
 # Type checking for python
 # typing
