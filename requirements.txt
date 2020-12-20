@@ -11,6 +11,7 @@ pyserial
 RPi.GPIO
 Pillow
 st7789
+numpy
 
 # Type checking for python
 # typing
