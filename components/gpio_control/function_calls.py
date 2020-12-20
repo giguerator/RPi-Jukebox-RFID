@@ -1,6 +1,7 @@
 import logging
 import sys
 from subprocess import Popen as function_call
+import testLBO
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,9 @@ def functionCallVolU(steps=None):
         function_call("{command} -c=volumeup -v={steps}".format(steps=steps,
             command=playout_control),
                 shell=True)
+
+def functionCallLowBatery(*args):
+    function_call("python testLBO.py",shell=False)
 
 
 def functionCallVolD(steps=None):
