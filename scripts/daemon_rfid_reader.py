@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python3
 
 import logging
@@ -11,12 +12,16 @@ from Reader import Reader
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 ch = logging.StreamHandler()
-ch.setLevel(logging.INFO)
+ch.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 ch.setFormatter(formatter)
 logger.addHandler(ch)
 
+logger.info('start')
+
 reader = Reader()
+
+logger.info('reader initialized')
 
 # get absolute path of this script
 dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -56,6 +61,10 @@ if sspc_nodelay == "ON":
 else:
     ids = ""
 
+removed = True
+
+logger.info('ready')
+
 while True:
     # reading the card id
     # NOTE: it's been reported that KKMOON Reader might need the following line altered.
@@ -65,7 +74,9 @@ while True:
     # cardid = reader.readCard()
     # See here for (German ;) details:
     # https://github.com/MiczFlor/RPi-Jukebox-RFID/issues/551
+    time.sleep(0.3)
     cardid = reader.reader.readCard()
+
     try:
         # start the player script and pass on the cardid (but only if new card or otherwise
         # "same_id_delay" seconds have passed)
@@ -74,6 +85,7 @@ while True:
                 logger.info('Trigger Play Cardid={cardid}'.format(cardid=cardid))
                 subprocess.call([dir_path + '/rfid_trigger_play.sh --cardid=' + cardid], shell=True)
                 previous_id = cardid
+                removed = False
 
             else:
                 logger.debug('Ignoring Card id {cardid} due to same-card-delay, delay: {same_id_delay}'.format(
@@ -82,6 +94,12 @@ while True:
                 ))
 
             previous_time = time.time()
+
+        elif removed == False:
+            logger.info('card removed - stopping')
+            subprocess.call([dir_path + '/playout_controls.sh -c=playerstop'], shell=True)
+            previous_id = ' '
+            removed = True
 
     except OSError as e:
         logger.error('Execution failed: {e}'.format(e=e))
