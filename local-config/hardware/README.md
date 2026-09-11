@@ -32,6 +32,14 @@ on sheet 2 carrying `SOFT_PWR_ON`, `CHARGE_EN`, `LOW_BAT_LVTTL` and `PB`.
 
 `CHARGE_EN` traces to J13 pin 11, the PowerBoost's raw `USB` signal.
 
+**LED colours in the drawing are wrong.** As built (confirmed by the owner
+2026-09-12): LED_1 and LED_2 are **green**, LED_4 is **red**. The schematic
+shows LED_1/LED_2 as red and LED_4 as green. Identify LEDs by net, not colour.
+
+The green "charging" light on the box is **LED_2 = `CHARGE_EN`**. It is lit
+by hardware whenever USB power is present. It does not indicate that charging
+is succeeding, and no software can turn it off.
+
 **So the charging LED is lit by hardware when USB power is present.** No GPIO
 output drives it. Nothing in the Mopidy-to-MPD migration could have changed it —
 `mopidy-raspberry-gpio` only ever did `GPIO.setup(pin, GPIO.IN, ...)` with a
