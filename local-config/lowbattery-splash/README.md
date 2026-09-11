@@ -63,6 +63,22 @@ low-battery event or a deliberate shutdown of the box, since the final step is a
 genuine power-off. The splash step and the config wiring were verified
 separately, but the two have never run in sequence.
 
+## Testing it by hand
+
+`testLBO.py` draws one frame and exits without clearing. In normal operation
+that is fine, because a shutdown follows immediately. Running it by hand leaves
+the "LOW BATTERY!" frame on the panel indefinitely, which reads as a real alarm.
+
+`clear_display.py` blanks the panel and switches the backlight off. Run it after
+any manual test. It does not affect the real path: `ST7789.__init__` drives the
+backlight pin LOW then HIGH on every instantiation, so the next splash re-lights
+it.
+
+To tell a stale frame from a real event, check the LBO line — `1` means low
+battery, `0` means the frame is stale:
+
+    python3 -c "import RPi.GPIO as G; G.setmode(G.BCM); G.setwarnings(False);       G.setup(12, G.IN, pull_up_down=G.PUD_DOWN); print(G.input(12))"
+
 ## Pre-existing, unrelated
 
 - `RuntimeError: Failed to add edge detection` on first start after boot,
