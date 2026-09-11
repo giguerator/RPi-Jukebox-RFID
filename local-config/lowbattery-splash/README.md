@@ -3,7 +3,7 @@
 Corrected versions of the two files that live in `~/Documents/throttle-status/`
 on the box (a clone of `M4XDMG/throttle-status`, with these added on top).
 
-**Not deployed.** As of 2026-09-11 the splash has never run on the box.
+**Deployed 2026-09-11.** Before that date the splash had never run.
 
 ## Why it never worked
 
@@ -30,14 +30,46 @@ The unit was also never copied into `/etc/systemd/system/`.
 
 Nothing else on the box currently drives the display.
 
-## Open design question
+## How it is wired
 
-`testLBO.py` draws one frame and exits — it does not watch the battery. Nothing
-starts it. The `[LowBattery]` section in `../gpio_settings.ini` currently calls
-`functionCallShutdown` directly on BCM 12, so the box powers off with no
-warning on screen.
+`ShutdownButton.callbackFunctionHandler` polls the pin every `iteration_time`
+for `hold_time` and only then calls the configured `functionCall`. It exposes no
+per-iteration hook other than an LED pin, so the splash cannot be shown *during*
+the 30 s hold — only once the hold completes, immediately before shutdown.
 
-Showing the splash during the 30 s hold means replacing that `functionCall`
-with something that draws the splash and then shuts down. That is a change to
-the GPIO config and probably a small wrapper script — not just installing this
-unit.
+`gpio_control.py` resolves `functionCall` with
+`getattr(self.function_calls, name)`, so the hook has to be a method on
+`phoniebox_function_calls`. Hence `function_calls.py.patch`, which adds
+`functionCallLowBatteryShutdown`: it runs `testLBO.py` with a 15 s timeout,
+swallows any exception so a display fault can never block the shutdown, then
+delegates to the stock `functionCallShutdown`.
+
+`../gpio_settings.ini` `[LowBattery]` now points at that method.
+
+`testsplash.service` is therefore **not needed** for the low-battery path and is
+not installed. Keep it only if you want to trigger the splash by hand.
+
+## Verified
+
+- `testLBO.py` exits 0 as both `pi` and `root` after the font fix
+- `getattr` resolves `functionCallLowBatteryShutdown` on the instance
+- `phoniebox-gpio-control` restarts clean: "adding GPIO-Device, LowBattery",
+  "Ready for taking actions", no traceback
+
+## Not verified
+
+The end-to-end path has **not** been triggered. Doing so requires either a real
+low-battery event or a deliberate shutdown of the box, since the final step is a
+genuine power-off. The splash step and the config wiring were verified
+separately, but the two have never run in sequence.
+
+## Pre-existing, unrelated
+
+- `RuntimeError: Failed to add edge detection` on first start after boot,
+  144 occurrences in the journal going back months. systemd's `RestartSec=3`
+  retries and the second attempt succeeds, so buttons are dead for roughly the
+  first 45 s after boot.
+- The box powers itself off on the 60 min idle timer
+  (`settings/Idle_Time_Before_Shutdown`), via `sudo poweroff` from `atd`. That
+  path does not go through `functionCall`, so it will not show the splash —
+  which is correct.

@@ -1,0 +1,31 @@
+diff --git a/components/gpio_control/function_calls.py b/components/gpio_control/function_calls.py
+index 5f6deb1..94a9349 100644
+--- a/components/gpio_control/function_calls.py
++++ b/components/gpio_control/function_calls.py
+@@ -1,6 +1,7 @@
+ import logging
+ import sys
+ from subprocess import Popen as function_call
++import subprocess
+ import os
+ import pathlib
+ 
+@@ -16,6 +17,18 @@ class phoniebox_function_calls:
+     def functionCallShutdown(self, *args):
+         function_call("{command} -c=shutdown".format(command=self.playout_control), shell=True)
+ 
++    # Local addition (not upstream): draw the low-battery splash on the ST7789
++    # before handing over to the normal Phoniebox shutdown. Wired to the
++    # [LowBattery] section of settings/gpio_settings.ini.
++    def functionCallLowBatteryShutdown(self, *args):
++        splash = '/home/pi/Documents/throttle-status/testLBO.py'
++        try:
++            subprocess.call(['/usr/bin/python3', splash], timeout=15)
++        except Exception:
++            # never let a display fault block the shutdown
++            self.logger.exception('low battery splash failed, shutting down anyway')
++        self.functionCallShutdown(*args)
++
+     def functionCallVolU(self, steps=None):
+         if steps is None:
+             function_call("{command} -c=volumeup".format(command=self.playout_control), shell=True)
