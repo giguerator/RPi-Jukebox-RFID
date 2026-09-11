@@ -45,6 +45,34 @@ output drives it. Nothing in the Mopidy-to-MPD migration could have changed it â
 `mopidy-raspberry-gpio` only ever did `GPIO.setup(pin, GPIO.IN, ...)` with a
 `handle_do_noting` that is literally `pass`.
 
+## GPIO15 needs a pull-down, or the charging LED lies
+
+**This was a regression, fixed 2026-09-12.**
+
+`mopidy.conf` had `bcm15 = do_nothing,active_high,250`. The handler
+`handle_do_noting` is literally `pass`, so this looked like a no-op when the
+buttons were migrated off Mopidy and the entry was dropped. It was not. The
+*setup* was the point:
+
+    pull = GPIO.PUD_UP
+    if settings.active == "active_high":
+        pull = GPIO.PUD_DOWN          # bcm15 took this branch
+    GPIO.setup(pin, GPIO.IN, pull_up_down=pull)
+
+Mopidy was holding GPIO15 down. With nothing configuring the pin, the
+`CHG_LVTTL` / `CHARGE_EN` net floats up and turns on the LED_2 transistor, so
+the green charging LED stays lit permanently regardless of USB state.
+
+Fix, in `/boot/config.txt` (backup `/boot/config.txt.orig-20260911`):
+
+    gpio=15=ip,pd
+
+Firmware applies this at init, before any service starts â€” strictly better than
+Mopidy, which only set it once it came up ~90 s into boot.
+
+**Do not treat a `do_nothing` GPIO entry as removable.** The pull it configures
+may be load-bearing.
+
 ## Open discrepancy, 2026-09-12
 
 With the charging LED lit:
