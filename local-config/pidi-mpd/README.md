@@ -134,6 +134,25 @@ the buttons feel sluggish, the same fix used for the RFID removal path applies â
 call `mpc` directly for next/prev/pause. Volume is worth leaving alone, since
 `playout_controls.sh` enforces the max-volume limit.
 
+### 3. Display never slept, so the charge LED stayed lit
+
+`mopidy-pidi` was configured with `idle_timeout = 900` in the `[pidi]` section
+of `mopidy.conf`. After 15 minutes with no player event it called
+`display.stop()`, which drops the backlight and issues `ST7789_DISPOFF`.
+
+The first version of `pidi-mpd.py` did not implement that at all, so GPIO 13
+was held high permanently â€” a constant extra load on a battery-powered box,
+which showed up as the charging light never going out.
+
+Fix: `IDLE_TIMEOUT_SEC = 900` in the daemon, matching the original. The render
+thread blanks the panel once idle and drops to a 0.5 s poll instead of spinning
+at 30 fps, then wakes on the next MPD event.
+
+Verified with a temporary 20 s timeout:
+
+    INFO idle for 20s, blanking display     -> GPIO 13: level=0
+    INFO waking display                     -> GPIO 13: level=1
+
 ## What was lost
 
 - **Iris**, Mopidy's web UI. The Phoniebox PHP web UI is unaffected.

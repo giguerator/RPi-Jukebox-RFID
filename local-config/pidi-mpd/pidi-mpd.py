@@ -28,6 +28,11 @@ CACHE_DIR = "/home/pi/.cache/pidi-mpd"
 
 FPS = 30.0
 BATTERY_INTERVAL_SEC = 5.0
+# Matches idle_timeout in the old [pidi] section of mopidy.conf. After this long
+# with no player event, blank the panel and drop the backlight - otherwise GPIO
+# 13 is held high forever, which is a constant drain on a battery-powered box.
+# 0 disables sleeping.
+IDLE_TIMEOUT_SEC = 900
 COVER_NAMES = ("cover.jpg", "cover.png", "folder.jpg", "folder.png", "front.jpg")
 
 logger = logging.getLogger("pidi-mpd")
@@ -62,6 +67,8 @@ class State:
         self.charge = 50.0
         # wall-clock anchor so the progress bar advances between MPD updates
         self.elapsed_anchor = time.time()
+        # last player event, for the idle blank
+        self.last_change = time.time()
 
 
 def find_local_cover(song_file):
@@ -88,6 +95,7 @@ class Renderer(threading.Thread):
         self.running.set()
         self._last_art = None
         self._last_battery_read = 0.0
+        self._display_on = True
         self._gauge = None
         try:
             self._gauge = DFRobot_MAX17043.DFRobot_MAX17043()
@@ -114,6 +122,29 @@ class Renderer(threading.Thread):
     def run(self):
         delay = 1.0 / FPS
         while self.running.is_set():
+            with self.state.lock:
+                idle_for = time.time() - self.state.last_change
+
+            if IDLE_TIMEOUT_SEC and idle_for >= IDLE_TIMEOUT_SEC:
+                if self._display_on:
+                    logger.info("idle for %.0fs, blanking display", idle_for)
+                    try:
+                        self.display.stop()
+                    except Exception:
+                        logger.exception("display stop failed")
+                    self._display_on = False
+                # nothing to draw while asleep; stop burning CPU at 30fps
+                time.sleep(0.5)
+                continue
+
+            if not self._display_on:
+                logger.info("waking display")
+                try:
+                    self.display.start()
+                except Exception:
+                    logger.exception("display start failed")
+                self._display_on = True
+
             with self.state.lock:
                 st = self.state
                 self._read_battery(st)
@@ -150,6 +181,7 @@ def apply_status(state, renderer, status, song):
         except (TypeError, ValueError):
             state.length = 0.0
         state.elapsed_anchor = time.time()
+        state.last_change = time.time()
         state.title = song.get("title") or os.path.basename(song.get("file", "")) or ""
         state.album = song.get("album") or ""
         state.artist = song.get("artist") or ""
