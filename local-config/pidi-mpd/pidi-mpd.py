@@ -100,6 +100,11 @@ class Renderer(threading.Thread):
         try:
             self._gauge = DFRobot_MAX17043.DFRobot_MAX17043()
             self._gauge.begin()
+            # The first read after begin() comes back 0.0% / 0.000V before the
+            # gauge has settled. Throw it away so the display never shows a
+            # spurious empty battery on startup.
+            self._gauge.readPercentage()
+            time.sleep(0.3)
         except Exception:
             # A dead gauge must not take the display down; charge just stays put.
             logger.exception("MAX17043 init failed, battery readings disabled")
@@ -115,7 +120,11 @@ class Renderer(threading.Thread):
             return
         self._last_battery_read = now
         try:
-            st.charge = round(self._gauge.readPercentage(), 2)
+            pct = self._gauge.readPercentage()
+            # A 0.0 reading means the gauge hiccuped, not a flat pack - a truly
+            # empty cell would have cut power long before this.
+            if pct > 0:
+                st.charge = round(pct, 2)
         except Exception:
             logger.exception("battery read failed")
 
