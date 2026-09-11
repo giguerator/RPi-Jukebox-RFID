@@ -88,6 +88,52 @@ mopidy-pidi ran at, so not a regression. On a single armv6 core that competes
 with the RFID reader. Lowering `FPS` in the daemon to 10 would free real
 headroom; the only cost is a choppier progress bar.
 
+## Two regressions the swap caused, and their fixes
+
+Both surfaced only after a reboot in normal use. Neither was visible in the
+service states — everything reported `active` while nothing worked.
+
+### 1. Nothing played, from RFID or the web UI
+
+`settings/edition` was `plusSpotify`. `playlist_recursive_by_folder.php` branches
+on it: `plusSpotify` emits Mopidy URIs, `classic` emits plain paths.
+
+    local:track:pigloo/Beijos%20de%20Esquim%C3%B3%20%28Bizoo%20D%27Eskimo%29-...mp3
+
+Plain MPD has no idea what `local:track:` is, so `mpc load pigloo` silently
+loaded **0 tracks**. MPD itself was healthy the whole time — `mpc add` + `mpc play`
+on a raw file worked fine, which is what made this confusing.
+
+Fix: `settings/edition` → `classic`, and `EDITION` in `settings/global.conf` to
+match. Playlists regenerate on each swipe, so stale ones heal themselves.
+
+Verified end to end: `./rfid_trigger_play.sh --cardid=1195791950544896` loads
+5 tracks and plays.
+
+### 2. All the music buttons stopped
+
+`mopidy-raspberry-gpio` was handling them, so they died with Mopidy. The
+mapping was in `/etc/mopidy/mopidy.conf`:
+
+    bcm5  = play_pause      bcm20 = play_pause
+    bcm6  = volume_down     bcm24 = volume_up
+    bcm16 = next            bcm22 = next
+    bcm27 = prev            bcm15 = do_nothing
+
+Only `Shutdown` (17) and `LowBattery` (12) were in `gpio_settings.ini`, which is
+why `gpio_control` looked healthy — it was loading everything it was asked to.
+
+Fix: those seven pins moved into `../gpio_settings.ini` as `Button` sections
+(`active_low` → `pull_up: True`), mapped to the stock `functionCallPlayerPause`,
+`functionCallVolU`/`VolD`, `functionCallPlayerNext`/`Prev`. `bcm15` was
+`do_nothing` and is omitted.
+
+**Known trade-off:** these route through `playout_controls.sh`, which costs
+~0.95 s per press (see `../rfid-latency/`). Mopidy handled them in-process. If
+the buttons feel sluggish, the same fix used for the RFID removal path applies —
+call `mpc` directly for next/prev/pause. Volume is worth leaving alone, since
+`playout_controls.sh` enforces the max-volume limit.
+
 ## What was lost
 
 - **Iris**, Mopidy's web UI. The Phoniebox PHP web UI is unaffected.
