@@ -1,0 +1,18 @@
+Fixes needed in ~/Documents/throttle-status/testLBO.py on the box.
+
+The font directory is "slab", not "slap". Both ImageFont.truetype() calls use
+the wrong path, so the script raises OSError on the first one and exits before
+touching the display. This is why the splash has never appeared, independently
+of the service never being installed.
+
+--- a/testLBO.py
++++ b/testLBO.py
+@@
+-fnt= ImageFont.truetype('/usr/share/fonts/truetype/roboto/slap/RobotoSlab-Bold.ttf',29)
++fnt= ImageFont.truetype('/usr/share/fonts/truetype/roboto/slab/RobotoSlab-Bold.ttf',29)
+@@
+-fnt2= ImageFont.truetype('/usr/share/fonts/truetype/roboto/slap/RobotoSlab-Bold.ttf',16)
++fnt2= ImageFont.truetype('/usr/share/fonts/truetype/roboto/slab/RobotoSlab-Bold.ttf',16)
+
+Verified present on the box:
+  /usr/share/fonts/truetype/roboto/slab/RobotoSlab-Bold.ttf

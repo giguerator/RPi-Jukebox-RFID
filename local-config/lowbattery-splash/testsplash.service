@@ -1,0 +1,20 @@
+# Corrected unit for the ST7789 low-battery splash.
+#
+# Install on the box with:
+#   sudo cp testsplash.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#
+# Do NOT `systemctl enable` this — it is not a boot service. It is meant to be
+# started on demand when the battery LBO line asserts. See README.md.
+
+[Unit]
+Description=Phoniebox low-battery splash
+After=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 -u /home/pi/Documents/throttle-status/testLBO.py
+WorkingDirectory=/home/pi/Documents/throttle-status
+StandardOutput=journal
+StandardError=journal
+User=pi
