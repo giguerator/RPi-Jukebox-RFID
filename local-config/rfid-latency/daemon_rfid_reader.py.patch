@@ -1,0 +1,39 @@
+--- scripts/daemon_rfid_reader.py.orig-20260911	2026-09-11 21:25:58.990119529 +0100
++++ scripts/daemon_rfid_reader.py	2026-09-11 21:26:01.030125403 +0100
+@@ -68,7 +68,10 @@
+     try:
+         # force pause the player script
+         logger.info('Trigger Pause Force')
+-        subprocess.call([dir_path + '/playout_controls.sh -c=playerpauseforce -v=0.1'], shell=True)
++        # Local change: playout_controls.sh's playerpauseforce is just
++        # "sleep $VALUE; mpc pause", but sourcing 15 config files and parsing
++        # 1137 lines of bash costs ~1s on armv6. Call mpc directly.
++        subprocess.call(['/usr/bin/mpc', 'pause'])
+     except OSError as e:
+         logger.info('Execution of Pause failed.')
+ 
+@@ -78,11 +81,12 @@
+ 
+ while True:
+     # slow down the card reading while loop
+-    time.sleep(0.2)
++    time.sleep(0.05)
+ 
+     if swipe_or_place == "PLACENOTSWIPE":
+-        # enable the signal alarm (if no card is present for 1 second)
+-        signal.alarm(1)
++        # Local change: signal.alarm() only accepts whole seconds, which floors
++        # removal detection at 1s. setitimer takes a float.
++        signal.setitimer(signal.ITIMER_REAL, 0.5)
+ 
+     # reading the card id
+     # NOTE: it's been reported that KKMOON Reader might need the following line altered.
+@@ -95,7 +99,7 @@
+     cardid = reader.reader.readCard()
+ 
+     # disable the alarm after a successful read
+-    signal.alarm(0)
++    signal.setitimer(signal.ITIMER_REAL, 0)
+ 
+     try:
+         # start the player script and pass on the cardid (but only if new card or otherwise
