@@ -32,13 +32,17 @@ on sheet 2 carrying `SOFT_PWR_ON`, `CHARGE_EN`, `LOW_BAT_LVTTL` and `PB`.
 
 `CHARGE_EN` traces to J13 pin 11, the PowerBoost's raw `USB` signal.
 
-**LED colours in the drawing are wrong.** As built (confirmed by the owner
-2026-09-12): LED_1 and LED_2 are **green**, LED_4 is **red**. The schematic
-shows LED_1/LED_2 as red and LED_4 as green. Identify LEDs by net, not colour.
+**The drawing's LED colours and my pin-position mapping were both wrong.**
+Confirmed against the built hardware by the owner, 2026-09-12:
 
-The green "charging" light on the box is **LED_2 = `CHARGE_EN`**. It is lit
-by hardware whenever USB power is present. It does not indicate that charging
-is succeeding, and no software can turn it off.
+| Colour | Net | Meaning |
+|---|---|---|
+| green | `SOFT_PWR_ON` (GPIO14) | power on - held high by `gpio=14=op,dh` |
+| blue | `CHARGE` | USB power present / charging |
+| red | `LOW_BAT_LVTTL` | low battery |
+
+Do not re-derive this from J2 / BUTTONS pin order in the drawing. That is how
+it was got wrong twice.
 
 **So the charging LED is lit by hardware when USB power is present.** No GPIO
 output drives it. Nothing in the Mopidy-to-MPD migration could have changed it —
@@ -82,10 +86,18 @@ With the charging LED lit:
 - the LC709203F showed a steady ~30 %/hour discharge (67.6 % -> 61.8 % over
   21 minutes), unchanged whether the display backlight was lit or blanked
 
-Two of the three indicators say the pack is not charging. Next test is to
-unplug USB and see whether the LED goes out: if it does, the USB-sense path
-(the 74HC125D buffer, or the `CHARGE_GPIO` 0R link) is not reaching the Pi; if
-it stays lit, the LED is wired to something other than `CHARGE_EN`.
+**Resolved 2026-09-12.** Charging works: the pack went 30 % -> 83 % while the
+box was powered off, and the blue `CHARGE` LED lights correctly when USB is
+connected. The earlier "not charging" reading was simply the box running on
+battery with USB unplugged - it had been unplugged for a diagnostic test.
+
+**What remains:** GPIO15 reads `level=0` even while the blue LED is lit and the
+pack is visibly charging. So `CHARGE_EN` reaches the LED but `CHG_LVTTL` never
+reaches the Pi through U1. Check `4OE#` (pin 13) is tied low and `+3_3V_IN`
+reaches pin 14.
+
+This is currently harmless - **no software reads GPIO15.** It only matters if
+the Pi is ever meant to know it is plugged in.
 
 **Do not toggle GPIO14 to identify an LED.** It is `SOFT_PWR_ON`, the power
 latch — driving it the wrong way cuts power to the box.
