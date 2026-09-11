@@ -69,7 +69,21 @@ never be the thing that keeps the service down.
 - Running the helper alone, then testing as `pi` with no delay: `edge` is
   `root:gpio 0660` and writable — the exact operation that failed before
 
-## Not verified
+## Confirmed on a real boot
 
-Behaviour across an actual reboot. The teardown test reproduces the state but
-not the boot-time load that makes udev lose the race in the first place.
+Reboot of 2026-09-11 14:04, the first since the fix:
+
+    $ journalctl -u phoniebox-gpio-control -b 0 | grep -c 'Failed to add edge detection'
+    0
+    $ systemctl show phoniebox-gpio-control -p NRestarts
+    NRestarts=0
+
+    14:04:39  Starting Phoniebox GPIO Control Service...
+    14:04:41  Started Phoniebox GPIO Control Service.
+    14:04:51  adding GPIO-Device, Shutdown
+    14:04:51  adding GPIO-Device, LowBattery
+    14:04:51  Ready for taking actions
+
+The two seconds between `Starting` and `Started` is the helper. Buttons are live
+about 12 s into boot instead of ~45 s, and the boot is clean rather than
+crash-retry-succeed.
