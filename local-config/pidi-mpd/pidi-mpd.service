@@ -1,0 +1,16 @@
+[Unit]
+Description=Pirate Audio ST7789 display, driven by MPD
+After=mpd.service
+Wants=mpd.service
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+ExecStart=/usr/local/bin/pidi-mpd.py
+Restart=always
+RestartSec=5
+SyslogIdentifier=pidi-mpd
+
+[Install]
+WantedBy=multi-user.target
