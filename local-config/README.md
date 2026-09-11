@@ -22,10 +22,14 @@ Audited 2026-09-11.
 
 Live path on the box: `~/RPi-Jukebox-RFID/settings/gpio_settings.ini`.
 
-Read by `components/gpio_control/gpio_control.py`, which in v2.3 hardcodes that
-absolute path. **Current upstream reads `~/.config/phoniebox/gpio_settings.ini`
-instead** — any upgrade must move this file or the buttons stop working with no
-error.
+Read by `components/gpio_control/gpio_control.py`, which hardcodes that absolute
+path. Current upstream (`gpio_control.py:132`) still uses the same hardcoded
+path, so there is no config-path migration to worry about on an upgrade. The
+installer's `EXISTINGuseGpio` prompt copies this file out of `~/BACKUP` into the
+new install for you.
+
+(`~/.config/phoniebox/gpio_settings.ini` appears nowhere in upstream — that path
+was introduced by the obsolete 2020 `stop_on_removal_PN532` branch.)
 
 Two buttons, both using the stock `ShutdownButton` type and the stock
 `functionCallShutdown`. No custom Python is involved.
