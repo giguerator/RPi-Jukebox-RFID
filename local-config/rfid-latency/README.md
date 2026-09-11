@@ -94,6 +94,44 @@ rule out a BT speaker later.
 Re-enable with `systemctl enable exim4`, `systemctl unmask colord`,
 `systemctl enable phpsessionclean.timer`.
 
+### Result after the service trims
+
+Rebooted 2026-09-11 21:36.
+
+| | Before | After |
+|---|---|---|
+| Total boot | 2 min 8.4 s | **1 min 59.1 s** |
+| `phoniebox-startup-scripts` | 1 min 39.0 s | 1 min 32.3 s |
+
+Only ~9 s. The service trims were not the lever, because the bottleneck is not
+contention — it is Mopidy itself. Monotonic timeline of the boot after the fix:
+
+    [ 33.9s]  Phoniebox RFID-Reader started
+    [ 35.2s]  systemd starts Mopidy
+    [ 93.4s]  Mopidy's FIRST log line: "Starting Mopidy 3.2.0"
+    [109.1s]  Mopidy backends up
+    [118.6s]  startup script unblocks
+
+**Mopidy spends 58 s between launch and printing anything** — pure Python import
+time for Mopidy, GStreamer, pykka and every extension on one armv6 core. Plus
+~15 s of init. Mopidy is ~74 s of a ~119 s boot.
+
+### Plain MPD, measured
+
+MPD 0.21.5 is already installed and fully configured on the box (music dir,
+playlist dir, hifiberry output) — just disabled.
+
+    MPD READY IN: 6.23 s
+
+Against Mopidy's 26 s idle / ~74 s at boot. That figure includes MPD's database
+scan, which had not run in years, so steady-state is likely lower.
+
+Projected boot if Mopidy were replaced: **~119 s → ~50 s.**
+
+Caveat observed during the test: `mpc status` under plain MPD reported
+`volume: n/a`. Mopidy provides SoftwareMixer; mpd.conf would need its mixer
+configured before `VOLUMEMANAGER=mpd` behaves.
+
 ### Known bug, not fixed
 
 `mpg123` **segfaults** on the startup sound every boot, after JACK connection
