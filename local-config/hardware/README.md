@@ -86,18 +86,24 @@ With the charging LED lit:
 - the LC709203F showed a steady ~30 %/hour discharge (67.6 % -> 61.8 % over
   21 minutes), unchanged whether the display backlight was lit or blanked
 
-**Resolved 2026-09-12.** Charging works: the pack went 30 % -> 83 % while the
-box was powered off, and the blue `CHARGE` LED lights correctly when USB is
-connected. The earlier "not charging" reading was simply the box running on
-battery with USB unplugged - it had been unplugged for a diagnostic test.
+**Resolved 2026-09-12.** Two separate things, both now understood.
 
-**What remains:** GPIO15 reads `level=0` even while the blue LED is lit and the
-pack is visibly charging. So `CHARGE_EN` reaches the LED but `CHG_LVTTL` never
-reaches the Pi through U1. Check `4OE#` (pin 13) is tied low and `+3_3V_IN`
-reaches pin 14.
+*Charging works.* The pack went 30 % -> 83 % while the box was powered off. The
+earlier flat discharge was simply the box running on battery: USB had been
+unplugged for a diagnostic test and not plugged back in.
 
-This is currently harmless - **no software reads GPIO15.** It only matters if
-the Pi is ever meant to know it is plugged in.
+*The LED needed the pull, and only the pull.* GPIO15 sits on the charge-LED net.
+With no pull configured the pin floats and **forces the LED on** regardless of
+the real charge state. That is the whole mechanism - nothing else is required,
+and there is no U1 fault to chase.
+
+`gpio=15=ip,pd` in `/boot/config.txt` is the complete fix, and is better than
+the old behaviour: firmware applies it at init, whereas mopidy-raspberry-gpio
+only set it once Mopidy started, ~90 s into boot.
+
+Nothing else reconfigures pin 15 - it is deliberately absent from
+`gpio_settings.ini`, so neither `gpio_control` nor the pre-export helper in
+`../gpio-edge-race/` will disturb it. **Keep it that way.**
 
 **Do not toggle GPIO14 to identify an LED.** It is `SOFT_PWR_ON`, the power
 latch — driving it the wrong way cuts power to the box.
