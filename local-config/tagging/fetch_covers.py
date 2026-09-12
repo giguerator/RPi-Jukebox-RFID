@@ -25,7 +25,8 @@ from mutagen.easyid3 import EasyID3
 MUSIC_DIR = "/home/pi/RPi-Jukebox-RFID/shared/audiofolders"
 CAA = "https://coverartarchive.org/release/%s/front-500"
 TRIES_PER_FOLDER = 4          # distinct track titles to attempt
-RELEASES_PER_TITLE = 3        # candidate releases per title
+RELEASES_PER_TITLE = 5        # candidate releases per title
+MIN_SCORE = 90                # reject weak MusicBrainz matches
 
 mus.set_useragent("phoniebox-cover-fetch", "1.0", "https://github.com/giguerator/RPi-Jukebox-RFID")
 
@@ -67,6 +68,18 @@ def caa_front(mbid):
     return None
 
 
+def _key(v):
+    return "".join(c for c in (v or "").lower() if c.isalnum())
+
+
+def artist_matches(want, credit):
+    """Loose but not permissive: one name must contain the other."""
+    a, b = _key(want), _key(credit)
+    if not a or not b:
+        return False
+    return a in b or b in a
+
+
 def find_cover(artist, titles):
     seen = set()
     tried = 0
@@ -84,6 +97,20 @@ def find_cover(artist, titles):
             print("      musicbrainz error: %s" % e)
             continue
         for rec in res.get("recording-list", []):
+            # MusicBrainz returns loose matches. Without checking the credited
+            # artist and the match score, "Paw Patrol" happily resolves to an
+            # unrelated French release that merely shares a track title.
+            try:
+                score = int(rec.get("ext:score", "0"))
+            except (TypeError, ValueError):
+                score = 0
+            if score < MIN_SCORE:
+                continue
+            credits = [c.get("artist", {}).get("name", "")
+                       for c in rec.get("artist-credit", [])
+                       if isinstance(c, dict)]
+            if not any(artist_matches(artist, c) for c in credits):
+                continue
             for rel in rec.get("release-list", []):
                 mbid = rel.get("id")
                 if not mbid:

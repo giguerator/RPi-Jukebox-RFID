@@ -68,9 +68,38 @@ its release, and pulls the front image from the Cover Art Archive.
 `cover.jpg` specifically, because `htdocs/api/cover.php` hardcodes that name.
 It is the only filename the web UI and the display both read.
 
-Expect misses on niche French-Canadian children's content (Passe-Partout,
-Les Titounis, comptines) - MusicBrainz simply does not carry it. Those need a
-hand-placed `cover.jpg`, now easy over the Samba share.
+### Match quality matters more than hit rate
+
+The first run matched on track title alone and took the first release carrying
+any cover art. That produced confidently wrong results:
+
+| Folder | Matched | |
+|---|---|---|
+| patpatrouille | L'Don & Compagnie hors-serie | wrong |
+| Monde des titounis | Meconium | wrong |
+| ferme_mathurin | Passe-Partout, volume 4 | wrong |
+| Reine des Neiges | Petites voix pour Leon | wrong |
+| Test | Singen - das geht so! | wrong |
+
+Unrelated releases happen to contain a track with a matching name. Two gates
+fixed it: the **credited artist must match** the folder's artist, and
+MusicBrainz's own **`ext:score` must be >= 90**. After that, patpatrouille
+resolved correctly to *PAW Patrol Horspielbox 2* and the rest were rejected
+rather than mismatched.
+
+A wrong cover is worse than no cover here - an empty one shows the default
+placeholder, a wrong one shows a stranger's album. Prefer rejecting.
+
+### Result, 2026-09-12
+
+14 of 22 folders have a cover. The remaining 8 need one placed by hand over the
+Samba share - MusicBrainz does not carry them:
+
+    Eléphant, ferme_mathurin, F-Zero, Grabouilla,
+    Monde des titounis, Pomme-de-reinette, Reine des Neiges, Test
+
+Mostly French-Canadian children's content and comptines. `Test` is a scratch
+folder and does not need one.
 
 ## For new downloads
 
