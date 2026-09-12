@@ -10,12 +10,14 @@ mopidy_pidi and mopidy must remain installed (pidi_display_pil imports its
 Display base class from mopidy_pidi.plugin), but neither needs to be running.
 """
 
+import hashlib
 import logging
 import os
 import threading
 import time
 
 from mpd import MPDClient, ConnectionError as MPDConnectionError
+from mutagen import File as MutagenFile
 
 from pidi_display_st7789 import DisplayST7789
 from mopidy_pidi import DFRobot_MAX17043
@@ -25,6 +27,7 @@ MPD_HOST = os.environ.get("MPD_HOST", "localhost")
 MPD_PORT = int(os.environ.get("MPD_PORT", 6600))
 MUSIC_DIR = "/home/pi/RPi-Jukebox-RFID/shared/audiofolders"
 CACHE_DIR = "/home/pi/.cache/pidi-mpd"
+EMBED_CACHE_DIR = os.path.join(CACHE_DIR, "embedded")
 
 FPS = 30.0
 BATTERY_INTERVAL_SEC = 5.0
@@ -81,6 +84,65 @@ def find_local_cover(song_file):
         if os.path.isfile(candidate):
             return candidate
     return None
+
+
+def extract_embedded_cover(song_file):
+    """Pull artwork embedded in the file itself and cache it as a file on disk.
+
+    MPD 0.21 has no `readpicture` command (that arrived in 0.22), and its
+    `albumart` only serves cover files from the song's directory - neither can
+    reach embedded art. Read the tag directly instead; mutagen handles ID3,
+    FLAC/Vorbis and MP4 alike, so this keeps working regardless of MPD version.
+
+    The display API takes a path, so the image is written to a cache keyed by
+    the song's URI.
+    """
+    if not song_file:
+        return None
+    path = os.path.join(MUSIC_DIR, song_file)
+    if not os.path.isfile(path):
+        return None
+
+    key = hashlib.sha1(song_file.encode("utf-8")).hexdigest()
+    cached = os.path.join(EMBED_CACHE_DIR, key + ".jpg")
+    if os.path.isfile(cached):
+        return cached if os.path.getsize(cached) else None
+
+    data = None
+    try:
+        tags = MutagenFile(path)
+        if tags is not None:
+            # ID3 (mp3): any APIC frame
+            if getattr(tags, "tags", None) is not None:
+                for k in tags.tags.keys():
+                    if k.startswith("APIC"):
+                        data = tags.tags[k].data
+                        break
+            # FLAC / Ogg
+            if data is None and getattr(tags, "pictures", None):
+                data = tags.pictures[0].data
+            # MP4 / M4A
+            if data is None:
+                try:
+                    covr = tags.get("covr")
+                except Exception:
+                    covr = None
+                if covr:
+                    data = bytes(covr[0])
+    except Exception:
+        logger.exception("embedded art extraction failed for %s", song_file)
+        return None
+
+    try:
+        # Write even when empty: a zero-byte marker means "checked, none here",
+        # so untagged tracks are not re-parsed on every track change.
+        with open(cached, "wb") as fh:
+            fh.write(data or b"")
+    except Exception:
+        logger.exception("could not cache embedded art for %s", song_file)
+        return cached if data else None
+
+    return cached if data else None
 
 
 class Renderer(threading.Thread):
@@ -196,7 +258,9 @@ def apply_status(state, renderer, status, song):
         state.artist = song.get("artist") or ""
         artist, album, title = state.artist, state.album, state.title
 
-    art = find_local_cover(song.get("file", ""))
+    # A cover file beside the track wins; then art embedded in the file itself;
+    # MusicBrainz only as a last resort, since it needs the network and tags.
+    art = find_local_cover(song.get("file", "")) or extract_embedded_cover(song.get("file", ""))
     if art:
         renderer.set_album_art(art)
     elif artist or album or title:
@@ -210,6 +274,7 @@ def main():
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s %(levelname)s %(message)s")
     os.makedirs(CACHE_DIR, exist_ok=True)
+    os.makedirs(EMBED_CACHE_DIR, exist_ok=True)
 
     display = DisplayST7789(DisplayConfig())
     display.start()

@@ -153,6 +153,33 @@ Verified with a temporary 20 s timeout:
     INFO idle for 20s, blanking display     -> GPIO 13: level=0
     INFO waking display                     -> GPIO 13: level=1
 
+## Album art
+
+Three sources, tried in this order:
+
+1. **A cover file beside the track** — `cover.jpg`, `cover.png`, `folder.jpg`,
+   `folder.png`, `front.jpg`. Fastest, works offline.
+2. **Art embedded in the file itself** — read with mutagen and cached under
+   `~/.cache/pidi-mpd/embedded/`, keyed by a hash of the song URI.
+3. **MusicBrainz**, via the reused `mopidy_pidi.brainz`. Needs artist + album
+   tags and the network.
+
+Embedded art is read directly rather than through MPD: `readpicture` arrived in
+MPD 0.22 and the box runs 0.21.4, and `albumart` only serves cover files from
+the song's directory. Reading the tag with mutagen sidesteps the version issue
+and handles ID3, FLAC/Vorbis and MP4 alike.
+
+Files with no embedded art get a zero-byte cache marker so they are not
+re-parsed on every track change.
+
+**Note the web UI wants something different.** `htdocs/api/cover.php` hardcodes
+`cover.jpg` in the folder — it reads neither `.png` nor embedded art. So
+`cover.jpg` is the only filename that satisfies both the display and the web UI.
+
+As of 2026-09-12 exactly 1 of 226 files in the library has embedded art, so
+source 2 is effectively forward-looking — for downloads made with
+`yt-dlp --embed-thumbnail --embed-metadata`.
+
 ## What was lost
 
 - **Iris**, Mopidy's web UI. The Phoniebox PHP web UI is unaffected.
